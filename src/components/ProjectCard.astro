@@ -1,0 +1,68 @@
+---
+import type { Project, City } from '../lib/types';
+import { formatStatus, formatProjectType } from '../lib/seo';
+
+interface Props {
+  project: Project & { city?: City };
+}
+
+const { project } = Astro.props;
+const city = project.city;
+const statusLabel = formatStatus(project.project_status);
+const statusColor: Record<string, string> = {
+  'new-launch': 'bg-green-100 text-green-800',
+  'under-construction': 'bg-yellow-100 text-yellow-800',
+  'ready-to-move': 'bg-blue-100 text-blue-800',
+};
+const typeColor = project.project_type === 'residential' ? 'bg-primary-100 text-primary-800' : 'bg-accent-100 text-accent-800';
+const projectUrl = city ? `/${city.slug}/${project.project_type}/${project.slug}` : '#';
+---
+
+<article class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group border border-gray-100">
+  <a href={projectUrl} class="block">
+    <div class="relative overflow-hidden aspect-[16/10]">
+      <img
+        src={project.featured_image}
+        alt={`${project.title} in ${project.location}${city ? `, ${city.name}` : ''}`}
+        loading="lazy"
+        width="400"
+        height="250"
+        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+      />
+      <div class="absolute top-3 left-3 flex gap-2">
+        <span class={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusColor[project.project_status] || 'bg-gray-100 text-gray-800'}`}>
+          {statusLabel}
+        </span>
+        <span class={`text-xs font-semibold px-2.5 py-1 rounded-full ${typeColor}`}>
+          {formatProjectType(project.project_type)}
+        </span>
+      </div>
+    </div>
+    <div class="p-4">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <h3 class="text-lg font-semibold text-gray-900 group-hover:text-primary-700 transition-colors line-clamp-1">
+          {project.title}
+        </h3>
+      </div>
+      <p class="text-sm text-gray-500 mb-2 flex items-center gap-1">
+        <svg class="w-4 h-4 text-accent-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+        </svg>
+        <span class="line-clamp-1">{project.location}{city ? `, ${city.name}` : ''}</span>
+      </p>
+      <p class="text-sm text-gray-600 mb-3 line-clamp-2">{project.short_description}</p>
+      <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div>
+          <p class="text-xs text-gray-500">by {project.builder_name}</p>
+          <p class="text-base font-bold text-primary-700">{project.price_range}</p>
+        </div>
+        <span class="inline-flex items-center gap-1 text-sm font-medium text-accent-600 group-hover:text-accent-700">
+          View Details
+          <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </span>
+      </div>
+    </div>
+  </a>
+</article>

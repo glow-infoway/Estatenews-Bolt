@@ -1,0 +1,36 @@
+---
+import ProjectCard from './ProjectCard.astro';
+import type { Project, City } from '../lib/types';
+
+interface Props {
+  projects: (Project & { city?: City })[];
+  title?: string;
+  showMore?: boolean;
+  moreUrl?: string;
+}
+
+const { projects, title, showMore, moreUrl } = Astro.props;
+---
+
+<section class="py-12">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    {title && (
+      <div class="flex items-center justify-between mb-8">
+        <h2 class="text-2xl font-bold text-gray-900">{title}</h2>
+        {showMore && moreUrl && (
+          <a href={moreUrl} class="text-sm font-medium text-accent-600 hover:text-accent-700 flex items-center gap-1 transition-colors">
+            View All
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+        )}
+      </div>
+    )}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {projects.map((project) => (
+        <ProjectCard project={project} />
+      ))}
+    </div>
+  </div>
+</section>

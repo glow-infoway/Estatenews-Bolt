@@ -1,0 +1,280 @@
+---
+export const prerender = true;
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CityCard from '../components/CityCard.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import CollectionCard from '../components/CollectionCard.astro';
+import { supabase } from '../lib/supabase';
+import { buildBreadcrumbSchema } from '../lib/seo';
+import type { City, Project, Collection } from '../lib/types';
+
+const [citiesRes, projectsRes, collectionsRes] = await Promise.all([
+  supabase.from('cities').select('*').order('name'),
+  supabase.from('projects').select('*, city:cities(*)').order('published_at', { ascending: false }),
+  supabase.from('collections').select('*, city:cities(*)').order('created_at', { ascending: false }),
+]);
+
+const cities: City[] = citiesRes.data || [];
+const allProjects: (Project & { city?: City })[] = projectsRes.data || [];
+const collections: (Collection & { city?: City })[] = collectionsRes.data || [];
+
+const residentialProjects = allProjects.filter((p) => p.project_type === 'residential');
+const commercialProjects = allProjects.filter((p) => p.project_type === 'commercial');
+const latestResidential = residentialProjects.slice(0, 6);
+const latestCommercial = commercialProjects.slice(0, 6);
+const trendingProjects = allProjects.slice(0, 4);
+
+const projectCounts: Record<string, number> = {};
+for (const p of allProjects) {
+  projectCounts[p.city_id] = (projectCounts[p.city_id] || 0) + 1;
+}
+
+const builders = [...new Set(allProjects.map((p) => p.builder_name).filter(Boolean))].slice(0, 8);
+
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: 'Home', url: 'https://propdiscover.com' },
+]);
+---
+
+<BaseLayout
+  title="PropDiscover - Top Real Estate Projects in Gujarat | Residential & Commercial Properties"
+  description="Discover the best residential and commercial real estate projects across Ahmedabad, Surat, and Rajkot. Explore new launches, luxury apartments, villas, and office spaces with premium amenities."
+  jsonLd={breadcrumbSchema}
+>
+  <!-- Hero Section -->
+  <section class="relative bg-primary-800 text-white overflow-hidden">
+    <div class="absolute inset-0 opacity-20">
+      <img src="https://images.pexels.com/photos/1474115/pexels-photo-1474115.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="" class="w-full h-full object-cover" loading="eager" width="1920" height="1080" />
+    </div>
+    <div class="absolute inset-0 bg-gradient-to-r from-primary-900/95 to-primary-800/80"></div>
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
+      <div class="max-w-3xl">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+          Discover Top <span class="text-accent-400">Real Estate</span> Projects in Gujarat
+        </h1>
+        <p class="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed">
+          Explore premium residential and commercial properties across Ahmedabad, Surat, and Rajkot. Find your perfect home or investment opportunity.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <input
+              type="text"
+              id="city-search"
+              placeholder="Search by city, project, or locality..."
+              class="w-full px-5 py-3.5 rounded-xl text-gray-900 bg-white shadow-lg focus:ring-2 focus:ring-accent-500 outline-none text-sm"
+            />
+          </div>
+          <button class="px-8 py-3.5 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl shadow-lg transition-colors text-sm">
+            Search Projects
+          </button>
+        </div>
+        <div id="search-results" class="hidden mt-3 bg-white rounded-xl shadow-xl overflow-hidden"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Cities -->
+  <section class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Explore by City</h2>
+        <p class="text-gray-600">Find the best properties in Gujarat's top real estate destinations</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {cities.map((city) => (
+          <CityCard city={city} projectCount={projectCounts[city.id]} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Residential / Commercial Tabs -->
+  <section class="py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center gap-4 mb-8 border-b border-gray-200">
+        <button id="tab-residential" class="tab-btn px-6 py-3 text-sm font-semibold border-b-2 border-primary-700 text-primary-700 transition-colors" data-tab="residential">
+          Residential Projects
+        </button>
+        <button id="tab-commercial" class="tab-btn px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors" data-tab="commercial">
+          Commercial Projects
+        </button>
+      </div>
+      <div id="panel-residential" class="tab-panel">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {latestResidential.map((project) => (
+            <ProjectCard project={project} />
+          ))}
+        </div>
+        <div class="text-center mt-8">
+          <a href="/ahmedabad/residential" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-700 hover:bg-primary-800 text-white font-medium rounded-lg transition-colors text-sm">
+            View All Residential Projects
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+      <div id="panel-commercial" class="tab-panel hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {latestCommercial.map((project) => (
+            <ProjectCard project={project} />
+          ))}
+        </div>
+        <div class="text-center mt-8">
+          <a href="/ahmedabad/commercial" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-700 hover:bg-primary-800 text-white font-medium rounded-lg transition-colors text-sm">
+            View All Commercial Projects
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trending Projects -->
+  <section class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Trending Projects</h2>
+        <p class="text-gray-600">Most searched and viewed projects this week</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {trendingProjects.map((project) => (
+          <ProjectCard project={project} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured Developers -->
+  <section class="py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Featured Developers</h2>
+        <p class="text-gray-600">Trusted builders delivering quality projects across Gujarat</p>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {builders.map((builder) => (
+          <div class="bg-white rounded-xl border border-gray-100 p-5 text-center hover:shadow-md transition-shadow">
+            <div class="w-12 h-12 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-900">{builder}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Collections -->
+  <section class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Curated Collections</h2>
+        <p class="text-gray-600">Handpicked project collections for every need and budget</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {collections.slice(0, 6).map((col) => (
+          <CollectionCard collection={col} />
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- SEO Content Block -->
+  <section class="py-16">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="prose prose-lg max-w-none">
+        <h2 class="text-2xl font-bold text-gray-900 mb-4">Gujarat Real Estate - Your Complete Property Guide</h2>
+        <p class="text-gray-600 leading-relaxed mb-4">
+          Gujarat has emerged as one of India's most dynamic real estate markets, with cities like Ahmedabad, Surat, and Rajkot leading the growth. The state's robust infrastructure development, expanding metro connectivity, and business-friendly policies have made it a prime destination for homebuyers and investors alike.
+        </p>
+        <p class="text-gray-600 leading-relaxed mb-4">
+          Ahmedabad, the commercial capital of Gujarat, offers a diverse range of residential and commercial projects. From luxury apartments on SG Highway and Prahlad Nagar to affordable housing in Bopal and Chandlodiya, the city caters to every budget and lifestyle. The Sabarmati Riverfront development has further enhanced the city's appeal with premium waterfront properties.
+        </p>
+        <p class="text-gray-600 leading-relaxed mb-4">
+          Surat, the diamond and textile capital of India, is witnessing unprecedented real estate growth. Areas like Vesu, Piplod, and Adajan offer premium residential options, while the Ring Road corridor is emerging as a major commercial hub. The upcoming metro connectivity is set to further boost property values in the city.
+        </p>
+        <p class="text-gray-600 leading-relaxed">
+          Rajkot, the cultural heart of Saurashtra, presents affordable yet quality real estate options. With developing areas like Kalawad Road and NBU Road, the city offers excellent value for both homebuyers and investors. The growing industrial corridor along Morbi Road is attracting commercial development and business investments.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Internal Links -->
+  <section class="py-12 bg-primary-800 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-xl font-bold mb-6">Quick Links</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {cities.map((city) => (
+          <div>
+            <h3 class="font-semibold text-accent-400 mb-2">{city.name}</h3>
+            <ul class="space-y-1">
+              <li><a href={`/${city.slug}/residential`} class="text-sm text-gray-300 hover:text-white transition-colors">Residential Projects</a></li>
+              <li><a href={`/${city.slug}/commercial`} class="text-sm text-gray-300 hover:text-white transition-colors">Commercial Projects</a></li>
+            </ul>
+          </div>
+        ))}
+        <div>
+          <h3 class="font-semibold text-accent-400 mb-2">Collections</h3>
+          <ul class="space-y-1">
+            {collections.slice(0, 3).map((col) => (
+              <li><a href={`/collections/${col.slug}`} class="text-sm text-gray-300 hover:text-white transition-colors">{col.title}</a></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const tabs = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const target = (tab as HTMLElement).dataset.tab;
+      tabs.forEach((t) => {
+        t.classList.remove('border-primary-700', 'text-primary-700');
+        t.classList.add('border-transparent', 'text-gray-500');
+      });
+      tab.classList.remove('border-transparent', 'text-gray-500');
+      tab.classList.add('border-primary-700', 'text-primary-700');
+      panels.forEach((p) => p.classList.add('hidden'));
+      document.getElementById(`panel-${target}`)?.classList.remove('hidden');
+    });
+  });
+
+  const searchInput = document.getElementById('city-search') as HTMLInputElement;
+  const searchResults = document.getElementById('search-results');
+  const cityData = [
+    { name: 'Ahmedabad', slug: 'ahmedabad' },
+    { name: 'Surat', slug: 'surat' },
+    { name: 'Rajkot', slug: 'rajkot' },
+  ];
+
+  searchInput?.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase().trim();
+    if (!q) {
+      searchResults?.classList.add('hidden');
+      return;
+    }
+    const matches = cityData.filter((c) => c.name.toLowerCase().includes(q));
+    if (matches.length > 0) {
+      searchResults!.innerHTML = matches
+        .map((c) => `<a href="/${c.slug}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">${c.name} Properties</a>`)
+        .join('');
+      searchResults?.classList.remove('hidden');
+    } else {
+      searchResults?.classList.add('hidden');
+    }
+  });
+
+  searchInput?.addEventListener('blur', () => {
+    setTimeout(() => searchResults?.classList.add('hidden'), 200);
+  });
+</script>

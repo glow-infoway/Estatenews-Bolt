@@ -1,0 +1,205 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { supabase } from '../../../lib/supabase';
+import type { Collection, City, Project } from '../../../lib/types';
+
+const [collRes, citiesRes, projectsRes] = await Promise.all([
+  supabase.from('collections').select('*, city:cities(name)').order('title'),
+  supabase.from('cities').select('*').order('name'),
+  supabase.from('projects').select('id, title, city_id, project_type').order('title'),
+]);
+
+const collections: any[] = collRes.data || [];
+const cities: City[] = citiesRes.data || [];
+const projects: Project[] = projectsRes.data || [];
+---
+
+<AdminLayout title="Collections" activeTab="collections">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Collections</h1>
+    <button id="add-coll-btn" class="px-4 py-2 bg-primary-700 hover:bg-primary-800 text-white font-medium rounded-lg transition-colors text-sm inline-flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add Collection
+    </button>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+    <table class="w-full">
+      <thead class="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Title</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Slug</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">City</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
+          <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {collections.map((c) => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-sm font-medium text-gray-900">{c.title}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">{c.slug}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">{c.city?.name || 'All'}</td>
+            <td class="px-4 py-3"><span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{c.collection_type}</span></td>
+            <td class="px-4 py-3 text-right">
+              <button class="edit-btn px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 rounded-md transition-colors" data-coll={JSON.stringify(c)}>Edit</button>
+              <button class="delete-btn px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors ml-2" data-id={c.id} data-name={c.title}>Delete</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {collections.length === 0 && <div class="text-center py-12 text-gray-500 text-sm">No collections found.</div>}
+  </div>
+
+  <!-- Modal -->
+  <div id="coll-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto py-8">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+      <h2 id="c-modal-title" class="text-lg font-bold text-gray-900 mb-4">Add Collection</h2>
+      <form id="coll-form" class="space-y-4">
+        <input type="hidden" id="c-id" />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+          <input type="text" id="c-title" required class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
+          <input type="text" id="c-slug" required class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <select id="c-city" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+              <option value="">All Cities</option>
+              {cities.map((c) => <option value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Collection Type</label>
+            <input type="text" id="c-type" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="e.g. luxury, top-projects" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Intro Content</label>
+          <textarea id="c-intro" rows="3" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+          <input type="text" id="c-meta-title" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+          <textarea id="c-meta-desc" rows="2" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Projects</label>
+          <div id="c-projects" class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+            {projects.map((p) => (
+              <label class="flex items-center gap-2 text-sm text-gray-700 py-1 px-2 rounded hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" class="project-check rounded text-primary-600" value={p.id} />
+                <span>{p.title}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="c-cancel" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-lg transition-colors">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ collections, projects: projects.map(p => ({ id: p.id, title: p.title })) }}>
+  const modal = document.getElementById('coll-modal')!;
+  const modalTitle = document.getElementById('c-modal-title')!;
+  const form = document.getElementById('coll-form') as HTMLFormElement;
+
+  async function loadCollectionProjects(collId: string) {
+    const token = document.cookie.match(/sb-auth-token=([^;]+)/)?.[1];
+    const res = await fetch(`/admin/api/collections?collection_id=${collId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const ids = await res.json();
+      document.querySelectorAll('.project-check').forEach((cb: HTMLInputElement) => {
+        cb.checked = ids.includes(cb.value);
+      });
+    }
+  }
+
+  function openModal(c?: any) {
+    if (c) {
+      modalTitle.textContent = 'Edit Collection';
+      (document.getElementById('c-id') as HTMLInputElement).value = c.id;
+      (document.getElementById('c-title') as HTMLInputElement).value = c.title;
+      (document.getElementById('c-slug') as HTMLInputElement).value = c.slug;
+      (document.getElementById('c-city') as HTMLSelectElement).value = c.city_id || '';
+      (document.getElementById('c-type') as HTMLInputElement).value = c.collection_type || '';
+      (document.getElementById('c-intro') as HTMLTextAreaElement).value = c.intro_content || '';
+      (document.getElementById('c-meta-title') as HTMLInputElement).value = c.meta_title || '';
+      (document.getElementById('c-meta-desc') as HTMLTextAreaElement).value = c.meta_description || '';
+      document.querySelectorAll('.project-check').forEach((cb: HTMLInputElement) => { cb.checked = false; });
+      loadCollectionProjects(c.id);
+    } else {
+      modalTitle.textContent = 'Add Collection';
+      form.reset();
+      (document.getElementById('c-id') as HTMLInputElement).value = '';
+      document.querySelectorAll('.project-check').forEach((cb: HTMLInputElement) => { cb.checked = false; });
+    }
+    modal.classList.remove('hidden');
+  }
+
+  document.getElementById('add-coll-btn')!.addEventListener('click', () => openModal());
+  document.getElementById('c-cancel')!.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => openModal(JSON.parse((btn as HTMLElement).dataset.coll!)));
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = document.cookie.match(/sb-auth-token=([^;]+)/)?.[1];
+    const id = (document.getElementById('c-id') as HTMLInputElement).value;
+    const projectIds = Array.from(document.querySelectorAll('.project-check:checked')).map((cb: HTMLInputElement) => cb.value);
+    const body = {
+      title: (document.getElementById('c-title') as HTMLInputElement).value,
+      slug: (document.getElementById('c-slug') as HTMLInputElement).value,
+      city_id: (document.getElementById('c-city') as HTMLSelectElement).value || null,
+      collection_type: (document.getElementById('c-type') as HTMLInputElement).value,
+      intro_content: (document.getElementById('c-intro') as HTMLTextAreaElement).value,
+      meta_title: (document.getElementById('c-meta-title') as HTMLInputElement).value,
+      meta_description: (document.getElementById('c-meta-desc') as HTMLTextAreaElement).value,
+      project_ids: projectIds,
+    };
+
+    const res = await fetch(id ? `/admin/api/collections?id=${id}` : '/admin/api/collections', {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) { window.location.reload(); }
+    else { const d = await res.json(); alert(d.error || 'Failed to save'); }
+  });
+
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Delete ${(btn as HTMLElement).dataset.name}?`)) return;
+      const token = document.cookie.match(/sb-auth-token=([^;]+)/)?.[1];
+      const res = await fetch(`/admin/api/collections?id=${(btn as HTMLElement).dataset.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) { window.location.reload(); }
+      else { alert('Failed to delete'); }
+    });
+  });
+
+  (document.getElementById('c-title') as HTMLInputElement).addEventListener('input', (e) => {
+    const slug = (e.target as HTMLInputElement).value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    (document.getElementById('c-slug') as HTMLInputElement).value = slug;
+  });
+</script>

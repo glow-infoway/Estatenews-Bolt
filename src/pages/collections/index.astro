@@ -1,0 +1,44 @@
+---
+export const prerender = true;
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CollectionCard from '../../components/CollectionCard.astro';
+import { supabase } from '../../lib/supabase';
+import { buildBreadcrumbSchema } from '../../lib/seo';
+import type { Collection } from '../../lib/types';
+
+const { data: collectionsData } = await supabase
+  .from('collections')
+  .select('*, city:cities(*)')
+  .order('created_at', { ascending: false });
+
+const collections: (Collection & { city?: any })[] = collectionsData || [];
+
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: 'Home', url: 'https://propdiscover.com' },
+  { name: 'Collections', url: 'https://propdiscover.com/collections' },
+]);
+---
+
+<BaseLayout
+  title="Curated Real Estate Collections | PropDiscover"
+  description="Explore handpicked collections of the best residential and commercial real estate projects across Gujarat. Luxury apartments, affordable homes, new launches, and more."
+  jsonLd={breadcrumbSchema}
+  breadcrumbs={[{ name: 'Collections', url: '/collections' }]}
+>
+  <section class="bg-primary-800 text-white py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-3xl md:text-4xl font-bold mb-3">Curated Collections</h1>
+      <p class="text-gray-300 text-lg">Handpicked project collections for every need and budget</p>
+    </div>
+  </section>
+
+  <section class="py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {collections.map((col) => (
+          <CollectionCard collection={col} />
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

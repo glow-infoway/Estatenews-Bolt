@@ -1,0 +1,225 @@
+---
+export const prerender = true;
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import CollectionCard from '../../components/CollectionCard.astro';
+import FAQSection from '../../components/FAQSection.astro';
+import { supabase } from '../../lib/supabase';
+import { buildBreadcrumbSchema, buildCitySchema, generateCityFAQs, buildFAQSchema } from '../../lib/seo';
+import type { City, Project, Collection } from '../../lib/types';
+
+export async function getStaticPaths() {
+  const { data: cities } = await supabase.from('cities').select('*');
+  return (cities || []).map((city) => ({
+    params: { city: city.slug },
+    props: { city },
+  }));
+}
+
+const { city } = Astro.props;
+
+const [projectsRes, collectionsRes] = await Promise.all([
+  supabase.from('projects').select('*').eq('city_id', city.id).order('published_at', { ascending: false }),
+  supabase.from('collections').select('*').eq('city_id', city.id).order('created_at', { ascending: false }),
+]);
+
+const projects: Project[] = projectsRes.data || [];
+const collections: Collection[] = collectionsRes.data || [];
+const residentialProjects = projects.filter((p) => p.project_type === 'residential');
+const commercialProjects = projects.filter((p) => p.project_type === 'commercial');
+const localities = [...new Set(projects.map((p) => p.location).filter(Boolean))];
+
+const faqs = generateCityFAQs(city);
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: 'Home', url: 'https://propdiscover.com' },
+  { name: city.name, url: `https://propdiscover.com/${city.slug}` },
+]);
+const citySchema = buildCitySchema(city);
+const faqSchema = buildFAQSchema(faqs);
+---
+
+<BaseLayout
+  title={city.meta_title || `${city.name} Real Estate | Top Residential & Commercial Projects`}
+  description={city.meta_description || `Discover the best residential and commercial real estate projects in ${city.name}, ${city.state}. Explore new launches, luxury apartments, villas, and office spaces.`}
+  jsonLd={[breadcrumbSchema, citySchema, faqSchema]}
+  breadcrumbs={[{ name: city.name, url: `/${city.slug}` }]}
+>
+  <!-- City Hero -->
+  <section class="relative bg-primary-800 text-white overflow-hidden">
+    <div class="absolute inset-0 opacity-20">
+      <img src={city.hero_image} alt="" class="w-full h-full object-cover" loading="eager" width="1920" height="1080" />
+    </div>
+    <div class="absolute inset-0 bg-gradient-to-r from-primary-900/95 to-primary-800/70"></div>
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div class="max-w-3xl">
+        <p class="text-accent-400 font-medium text-sm mb-3 uppercase tracking-wider">{city.state}</p>
+        <h1 class="text-4xl md:text-5xl font-bold leading-tight mb-6">
+          Real Estate in <span class="text-accent-400">{city.name}</span>
+        </h1>
+        <p class="text-lg text-gray-300 leading-relaxed mb-8">{city.overview}</p>
+        <div class="flex flex-wrap gap-4">
+          <a href={`/${city.slug}/residential`} class="px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-lg transition-colors text-sm">
+            Residential Projects ({residentialProjects.length})
+          </a>
+          <a href={`/${city.slug}/commercial`} class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg border border-white/20 transition-colors text-sm">
+            Commercial Projects ({commercialProjects.length})
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- City Overview -->
+  <section class="py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-gray-100 p-5 text-center shadow-sm">
+          <p class="text-3xl font-bold text-primary-700">{projects.length}</p>
+          <p class="text-sm text-gray-500 mt-1">Total Projects</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-5 text-center shadow-sm">
+          <p class="text-3xl font-bold text-primary-700">{residentialProjects.length}</p>
+          <p class="text-sm text-gray-500 mt-1">Residential</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-5 text-center shadow-sm">
+          <p class="text-3xl font-bold text-primary-700">{commercialProjects.length}</p>
+          <p class="text-sm text-gray-500 mt-1">Commercial</p>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-5 text-center shadow-sm">
+          <p class="text-3xl font-bold text-primary-700">{localities.length}</p>
+          <p class="text-sm text-gray-500 mt-1">Localities</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Residential Projects -->
+  {residentialProjects.length > 0 && (
+    <section class="py-12 bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between mb-8">
+          <h2 class="text-2xl font-bold text-gray-900">Residential Projects in {city.name}</h2>
+          <a href={`/${city.slug}/residential`} class="text-sm font-medium text-accent-600 hover:text-accent-700 flex items-center gap-1">
+            View All
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {residentialProjects.slice(0, 6).map((project) => (
+            <ProjectCard project={{ ...project, city }} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Commercial Projects -->
+  {commercialProjects.length > 0 && (
+    <section class="py-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between mb-8">
+          <h2 class="text-2xl font-bold text-gray-900">Commercial Projects in {city.name}</h2>
+          <a href={`/${city.slug}/commercial`} class="text-sm font-medium text-accent-600 hover:text-accent-700 flex items-center gap-1">
+            View All
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {commercialProjects.slice(0, 6).map((project) => (
+            <ProjectCard project={{ ...project, city }} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Top Localities -->
+  {localities.length > 0 && (
+    <section class="py-12 bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Top Localities in {city.name}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {localities.map((loc) => (
+            <a href={`/${city.slug}/residential?location=${encodeURIComponent(loc)}`} class="bg-white rounded-lg border border-gray-100 px-4 py-3 text-sm text-gray-700 hover:border-primary-300 hover:text-primary-700 transition-colors">
+              {loc}
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Collections -->
+  {collections.length > 0 && (
+    <section class="py-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Curated Collections for {city.name}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {collections.map((col) => (
+            <CollectionCard collection={col} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Market Statistics -->
+  <section class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-2xl font-bold text-gray-900 mb-6">{city.name} Market Statistics</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <h3 class="font-semibold text-gray-900 mb-4">Residential Market</h3>
+          <div class="space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">New Launch Projects</span>
+              <span class="font-medium text-gray-900">{residentialProjects.filter(p => p.project_status === 'new-launch').length}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Under Construction</span>
+              <span class="font-medium text-gray-900">{residentialProjects.filter(p => p.project_status === 'under-construction').length}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Ready to Move</span>
+              <span class="font-medium text-gray-900">{residentialProjects.filter(p => p.project_status === 'ready-to-move').length}</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <h3 class="font-semibold text-gray-900 mb-4">Commercial Market</h3>
+          <div class="space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">New Launch Projects</span>
+              <span class="font-medium text-gray-900">{commercialProjects.filter(p => p.project_status === 'new-launch').length}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Under Construction</span>
+              <span class="font-medium text-gray-900">{commercialProjects.filter(p => p.project_status === 'under-construction').length}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Ready to Move</span>
+              <span class="font-medium text-gray-900">{commercialProjects.filter(p => p.project_status === 'ready-to-move').length}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQs -->
+  <FAQSection faqs={faqs} title={`${city.name} Real Estate FAQs`} />
+
+  <!-- Internal Links -->
+  <section class="py-12 bg-primary-800 text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-xl font-bold mb-6">Explore More</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <a href={`/${city.slug}/residential`} class="text-sm text-gray-300 hover:text-white transition-colors">Residential Projects in {city.name}</a>
+        <a href={`/${city.slug}/commercial`} class="text-sm text-gray-300 hover:text-white transition-colors">Commercial Projects in {city.name}</a>
+        {collections.map((col) => (
+          <a href={`/collections/${col.slug}`} class="text-sm text-gray-300 hover:text-white transition-colors">{col.title}</a>
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>

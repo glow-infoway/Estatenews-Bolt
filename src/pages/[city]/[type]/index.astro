@@ -1,0 +1,205 @@
+---
+export const prerender = true;
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ProjectCard from '../../../components/ProjectCard.astro';
+import FilterSidebar from '../../../components/FilterSidebar.astro';
+import FAQSection from '../../../components/FAQSection.astro';
+import { supabase } from '../../../lib/supabase';
+import { buildBreadcrumbSchema, buildFAQSchema, formatProjectType, ITEMS_PER_PAGE } from '../../../lib/seo';
+import type { City, Project } from '../../../lib/types';
+
+export async function getStaticPaths() {
+  const { data: cities } = await supabase.from('cities').select('*');
+  const paths = [];
+  for (const city of cities || []) {
+    const { data: projects } = await supabase.from('projects').select('*').eq('city_id', city.id);
+    const types = [...new Set((projects || []).map((p) => p.project_type))];
+    for (const type of types) {
+      paths.push({
+        params: { city: city.slug, type },
+        props: { city, projectType: type },
+      });
+    }
+  }
+  return paths;
+}
+
+const { city, projectType } = Astro.props;
+
+const { data: projectsData } = await supabase
+  .from('projects')
+  .select('*')
+  .eq('city_id', city.id)
+  .eq('project_type', projectType)
+  .order('published_at', { ascending: false });
+
+const projects: Project[] = projectsData || [];
+const locations = [...new Set(projects.map((p) => p.location).filter(Boolean))];
+const amenities = [...new Set(projects.flatMap((p) => p.amenities).filter(Boolean))].sort();
+const statuses = [...new Set(projects.map((p) => p.project_status).filter(Boolean))];
+
+const typeLabel = formatProjectType(projectType);
+const otherType = projectType === 'residential' ? 'commercial' : 'residential';
+
+const faqs = [
+  {
+    question: `What are the best ${typeLabel.toLowerCase()} projects in ${city.name}?`,
+    answer: `${city.name} offers several top-rated ${typeLabel.toLowerCase()} projects across prime localities. Explore our curated list above for the best options with modern amenities and excellent connectivity.`,
+  },
+  {
+    question: `What is the price range for ${typeLabel.toLowerCase()} properties in ${city.name}?`,
+    answer: `${typeLabel} property prices in ${city.name} vary by locality and project. Browse our listings above for detailed pricing information across different budget segments.`,
+  },
+  {
+    question: `Which localities in ${city.name} are best for ${typeLabel.toLowerCase()} investment?`,
+    answer: `Top localities for ${typeLabel.toLowerCase()} investment in ${city.name} include ${locations.slice(0, 3).join(', ')}. These areas offer excellent infrastructure and connectivity.`,
+  },
+];
+
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: 'Home', url: 'https://propdiscover.com' },
+  { name: city.name, url: `https://propdiscover.com/${city.slug}` },
+  { name: typeLabel, url: `https://propdiscover.com/${city.slug}/${projectType}` },
+]);
+const faqSchema = buildFAQSchema(faqs);
+---
+
+<BaseLayout
+  title={`${typeLabel} Projects in ${city.name} | Top Properties & Prices`}
+  description={`Explore the best ${typeLabel.toLowerCase()} projects in ${city.name}, ${city.state}. Find new launches, under-construction, and ready-to-move properties with premium amenities and prime locations.`}
+  jsonLd={[breadcrumbSchema, faqSchema]}
+  breadcrumbs={[
+    { name: city.name, url: `/${city.slug}` },
+    { name: typeLabel, url: `/${city.slug}/${projectType}` },
+  ]}
+>
+  <!-- Category Hero -->
+  <section class="bg-primary-800 text-white py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-3xl md:text-4xl font-bold mb-3">
+        {typeLabel} Projects in {city.name}
+      </h1>
+      <p class="text-gray-300 text-lg">
+        {projects.length} {typeLabel.toLowerCase()} projects available across {locations.length} localities
+      </p>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <section class="py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col lg:flex-row gap-8">
+        <FilterSidebar
+          projectType={projectType}
+          citySlug={city.slug}
+          cityName={city.name}
+          locations={locations}
+          amenities={amenities}
+          statuses={statuses}
+        />
+        <div class="flex-1">
+          <div class="flex items-center justify-between mb-6">
+            <p class="text-sm text-gray-500">
+              Showing <span class="font-medium text-gray-900">{projects.length}</span> projects
+            </p>
+            <select id="sort-projects" class="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-primary-500 outline-none">
+              <option value="latest">Latest First</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+            </select>
+          </div>
+          <div id="projects-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-projects={JSON.stringify(projects.map(p => ({
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            location: p.location,
+            builder_name: p.builder_name,
+            price_range: p.price_range,
+            short_description: p.short_description,
+            featured_image: p.featured_image,
+            project_type: p.project_type,
+            project_status: p.project_status,
+            amenities: p.amenities,
+          })))} data-city={JSON.stringify(city)} data-type={projectType}>
+            {projects.map((project) => (
+              <div class="project-item" data-location={project.location} data-status={project.project_status} data-amenities={project.amenities.join(',')}>
+                <ProjectCard project={{ ...project, city }} />
+              </div>
+            ))}
+          </div>
+          {projects.length === 0 && (
+            <div class="text-center py-16">
+              <p class="text-gray-500 text-lg">No {typeLabel.toLowerCase()} projects found in {city.name}.</p>
+              <a href={`/${city.slug}/${otherType}`} class="mt-4 inline-block text-accent-600 hover:text-accent-700 font-medium text-sm">
+                Explore {otherType === 'residential' ? 'Residential' : 'Commercial'} Projects instead
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEO Intro -->
+  <section class="py-12 bg-gray-50">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">{typeLabel} Real Estate in {city.name}</h2>
+      <p class="text-gray-600 leading-relaxed mb-4">
+        {city.name} {typeLabel.toLowerCase()} real estate market offers a wide range of options for homebuyers and investors. From affordable housing to luxury apartments, the city has projects across every budget segment. Key localities like {locations.slice(0, 3).join(', ')} are witnessing significant development with new project launches.
+      </p>
+      <p class="text-gray-600 leading-relaxed">
+        With improving infrastructure, expanding metro connectivity, and growing commercial activity, {city.name} continues to be one of the most promising real estate destinations in {city.state}. Whether you are looking for a dream home or a smart investment, explore our comprehensive listing of {typeLabel.toLowerCase()} projects above.
+      </p>
+    </div>
+  </section>
+
+  <!-- FAQs -->
+  <FAQSection faqs={faqs} />
+
+  <!-- Related Collections -->
+  <section class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-4">Explore More in {city.name}</h2>
+      <div class="flex flex-wrap gap-3">
+        <a href={`/${city.slug}/${otherType}`} class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:border-primary-300 hover:text-primary-700 transition-colors">
+          {otherType === 'residential' ? 'Residential' : 'Commercial'} Projects
+        </a>
+        <a href={`/${city.slug}`} class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:border-primary-300 hover:text-primary-700 transition-colors">
+          All Projects in {city.name}
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const locationFilter = document.getElementById('filter-location') as HTMLSelectElement;
+  const statusFilter = document.getElementById('filter-status') as HTMLSelectElement;
+  const amenityFilter = document.getElementById('filter-amenity') as HTMLSelectElement;
+  const clearBtn = document.getElementById('clear-filters');
+  const items = document.querySelectorAll('.project-item');
+
+  function applyFilters() {
+    const loc = locationFilter?.value || '';
+    const status = statusFilter?.value || '';
+    const amenity = amenityFilter?.value || '';
+    items.forEach((item) => {
+      const el = item as HTMLElement;
+      const matchLoc = !loc || el.dataset.location === loc;
+      const matchStatus = !status || el.dataset.status === status;
+      const matchAmenity = !amenity || el.dataset.amenities?.includes(amenity);
+      el.style.display = matchLoc && matchStatus && matchAmenity ? '' : 'none';
+    });
+  }
+
+  locationFilter?.addEventListener('change', applyFilters);
+  statusFilter?.addEventListener('change', applyFilters);
+  amenityFilter?.addEventListener('change', applyFilters);
+
+  clearBtn?.addEventListener('click', () => {
+    if (locationFilter) locationFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
+    if (amenityFilter) amenityFilter.value = '';
+    applyFilters();
+  });
+</script>
